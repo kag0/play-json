@@ -657,7 +657,15 @@ trait EnvReads {
 
   /** Deserializer of Java Duration from a number of milliseconds. */
   val javaDurationMillisReads: Reads[JDuration] =
-    javaDurationNumberReads(ChronoUnit.MILLIS)
+    Reads[JDuration] {
+      case n @ JsNumber(value) if value.isWhole =>
+        javaDurationNumberReads(ChronoUnit.MILLIS).reads(n)
+      case JsNumber(value) =>
+        val ns = value * 1000000
+        if (ns.isWhole) javaDurationNumberReads(ChronoUnit.NANOS).reads(JsNumber(ns))
+        else JsError("error.expected.nsPrecision")
+      case _ => JsError("error.expected.numberDuration")
+    }
 
   /**
    * Deserializer of Java Duration, from either a time-based amount of time
